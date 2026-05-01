@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>주식 카드뉴스 AI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+
+<body>
+
+<h2>📈 주식 카드뉴스 자동 생성</h2>
+
+<textarea id="input" placeholder="종목 또는 뉴스 입력"></textarea>
+<br>
+<button onclick="run()">생성</button>
+
+<div id="status"></div>
+
+<h3>🔥 제목</h3>
+<div id="title" class="box"></div>
+
+<h3>📄 카드뉴스</h3>
+<div id="slides" class="box"></div>
+
+<h3>🖼 이미지</h3>
+<canvas id="canvas" width="1080" height="1080"></canvas>
+
+<br>
+<button onclick="download()">다운로드</button>
+
+<script src="app.js"></script>
+
+</body>
+</html>
