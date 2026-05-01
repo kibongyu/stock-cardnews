@@ -4,30 +4,65 @@
   <meta charset="UTF-8">
   <title>주식 카드뉴스 AI</title>
   <link rel="stylesheet" href="style.css">
-</head>
 
+  <style>
+    body {
+      font-family: Arial;
+      background: #111;
+      color: #fff;
+      padding: 20px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 80px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 10px 0;
+      cursor: pointer;
+    }
+
+    .box {
+      background: #222;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 400px;
+      margin-bottom: 20px;
+      border: 1px solid #333;
+    }
+  </style>
+</head>
 
 <body>
 
 <h2>📈 주식 카드뉴스 자동 생성</h2>
 
-<textarea id="input" placeholder="종목 또는 뉴스 입력"></textarea>
+<textarea id="input" placeholder="예: 삼성전자"></textarea>
 <br>
-<button onclick="run()">생성</button>
+<button onclick="run()">🚀 생성</button>
 
 <div id="status"></div>
 
 <h3>🔥 제목</h3>
 <div id="title" class="box"></div>
 
-<h3>📄 카드뉴스</h3>
+<h3>📄 카드뉴스 텍스트</h3>
 <div id="slides" class="box"></div>
 
-<h3>🖼 이미지</h3>
-<canvas id="canvas" width="1080" height="1080"></canvas>
+<h3>🖼 카드뉴스 이미지 (5장 자동 생성)</h3>
+
+<!-- 🔥 핵심: 여러 장 이미지 컨테이너 -->
+<div id="images"></div>
 
 <br>
-<button onclick="download()">다운로드</button>
+<button onclick="downloadAll()">📥 전체 다운로드</button>
 
 <script src="app.js"></script>
 
