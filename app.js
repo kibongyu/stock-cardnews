@@ -4,19 +4,23 @@ async function run() {
   const status = document.getElementById("status");
 
   if (!input) {
-    status.innerText = "❗ 입력값이 필요합니다";
+    status.innerText = "❗ 종목명을 입력하세요 (예: 삼성전자)";
     return;
   }
 
   try {
-    status.innerText = "⏳ 생성 중...";
+    status.innerText = "📰 뉴스 수집 중...";
 
-    const titles = await generateTitles(input);
+    const news = await getNews(input);
+
+    status.innerText = "🤖 카드뉴스 생성 중...";
+
+    const titles = await generateTitles(input, news);
     const bestTitle = await pickBestTitle(titles);
 
     document.getElementById("title").innerText = bestTitle;
 
-    const slides = await generateSlides(input);
+    const slides = await generateSlides(input, news);
 
     document.getElementById("slides").innerHTML =
       slides.map((s, i) => `${i + 1}. ${s}`).join("<br><br>");
@@ -24,15 +28,47 @@ async function run() {
     drawSlides(bestTitle, slides);
 
     status.innerText = "✅ 완료!";
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-
   } catch (err) {
     console.error(err);
-    status.innerText = "❌ 오류 발생: " + err.message;
+    status.innerText = "❌ 오류: " + err.message;
   }
 }
 
+////////////////////////////////////////////////////
+// 👉 뉴스 가져오기 (Google RSS)
+////////////////////////////////////////////////////
+async function getNews(keyword) {
+  const url = `https://api.allorigins.win/get?url=${encodeURIComponent(
+    `https://news.google.com/rss/search?q=${keyword}&hl=ko&gl=KR&ceid=KR:ko`
+  )}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(data.contents, "text/xml");
+
+  const items = xml.querySelectorAll("item");
+
+  let news = [];
+
+  items.forEach((item, i) => {
+    if (i < 5) {
+      news.push({
+        title: item.querySelector("title").textContent,
+        desc: item.querySelector("description").textContent
+      });
+    }
+  });
+
+  if (news.length === 0) throw new Error("뉴스 없음");
+
+  return news;
+}
+
+////////////////////////////////////////////////////
 // 👉 Worker 호출
+////////////////////////////////////////////////////
 async function callGPT(prompt) {
   const res = await fetch("https://rough-darkness-c973.loadbong.workers.dev", {
     method: "POST",
@@ -42,46 +78,40 @@ async function callGPT(prompt) {
     body: JSON.stringify({ prompt })
   });
 
-  if (!res.ok) {
-    throw new Error("Worker 오류: " + res.status);
-  }
+  if (!res.ok) throw new Error("Worker 오류");
 
   const data = await res.json();
-
-  if (data.error) {
-    throw new Error(data.error);
-  }
 
   return data.choices[0].message.content;
 }
 
-// 👉 제목 생성 (조회수용)
-async function generateTitles(text) {
+////////////////////////////////////////////////////
+// 👉 제목 생성
+////////////////////////////////////////////////////
+async function generateTitles(text, news) {
+  const newsText = news.map(n => n.title).join("\n");
+
   const prompt = `
-  "${text}" 관련 주식 카드뉴스 제목 3개 생성
+  아래 뉴스 기반으로 주식 카드뉴스 제목 3개 생성
 
-  [조건]
-  - 클릭 유도형
-  - 실제 이슈 기반
+  ${newsText}
+
+  조건:
   - 20자 이내
-  - 자극적 문장 허용
-
-  예시:
-  "삼성전자 왜 급등했나"
-  "지금 반드시 봐야 할 이유"
-
-  내용:
-  ${text}
+  - 클릭 유도
+  - 실제 이슈 반영
   `;
 
   const res = await callGPT(prompt);
-  return res.split("\n").filter(t => t.trim() !== "");
+  return res.split("\n").filter(t => t.trim());
 }
 
+////////////////////////////////////////////////////
 // 👉 제목 선택
+////////////////////////////////////////////////////
 async function pickBestTitle(titles) {
   const prompt = `
-  다음 제목 중 클릭률 가장 높은 1개만 선택:
+  가장 클릭률 높은 제목 1개 선택:
 
   ${titles.join("\n")}
   `;
@@ -89,46 +119,53 @@ async function pickBestTitle(titles) {
   return await callGPT(prompt);
 }
 
+////////////////////////////////////////////////////
 // 👉 카드뉴스 생성 (핵심)
-async function generateSlides(text) {
-  const prompt = `
-  "${text}" 관련 실제 주식 이슈 기반 카드뉴스 작성
+////////////////////////////////////////////////////
+async function generateSlides(text, news) {
 
-  [조건]
-  - 총 5페이지
+  const newsText = news.map(n =>
+    `제목:${n.title}\n내용:${n.desc}`
+  ).join("\n\n");
+
+  const prompt = `
+  아래 실제 뉴스 기반으로 카드뉴스 5장 생성
+
+  ${newsText}
+
+  조건:
+  - 5줄 출력
   - 각 줄 = 카드 1장
-  - 반드시 실제 이유 포함
-  - 기업명 / 수치 / 이슈 포함
+  - 반드시 기업명 포함
+  - 상승 이유, 리스크 포함
   - 추상적인 말 금지
 
-  [형식]
-  1. 왜 상승했나 (핵심)
-  2. 상승 이유 1
-  3. 상승 이유 2
+  형식:
+  1. 핵심 이슈
+  2. 상승 이유
+  3. 추가 이유
   4. 리스크
-  5. 지금 봐야 하는 이유
-
-  내용:
-  ${text}
+  5. 투자 포인트
   `;
 
   const res = await callGPT(prompt);
-  return res.split("\n").filter(t => t.trim() !== "");
+  return res.split("\n").filter(t => t.trim());
 }
 
-// 👉 여러 장 이미지 생성 (핵심 개선)
+////////////////////////////////////////////////////
+// 👉 이미지 5장 생성
+////////////////////////////////////////////////////
 function drawSlides(title, slides) {
   const container = document.getElementById("images");
   container.innerHTML = "";
 
-  slides.forEach((slide, index) => {
+  slides.forEach((slide) => {
     const canvas = document.createElement("canvas");
     canvas.width = 1080;
     canvas.height = 1080;
 
     const ctx = canvas.getContext("2d");
 
-    // 배경
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, 1080, 1080);
 
@@ -146,7 +183,9 @@ function drawSlides(title, slides) {
   });
 }
 
+////////////////////////////////////////////////////
 // 👉 줄바꿈
+////////////////////////////////////////////////////
 function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   const words = text.split(" ");
   let line = "";
@@ -166,7 +205,9 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   ctx.fillText(line, x, y);
 }
 
-// 👉 전체 다운로드 (여러 장)
+////////////////////////////////////////////////////
+// 👉 다운로드
+////////////////////////////////////////////////////
 function downloadAll() {
   const canvases = document.querySelectorAll("#images canvas");
 
